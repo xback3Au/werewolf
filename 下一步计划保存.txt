@@ -1,0 +1,258 @@
+当前 vs 目标
+功能	当前状态	你的目标
+数据存储	JSON 字段	关系型表 + 向量索引
+查询方式	按阶段查看	自然语言对话
+身份判断	单条发言分析	全局状态 + 时间线推理
+关联信息	无	发言↔投票↔死亡↔角色关联
+实现路线图
+阶段 1：数据结构化（现在）
+创建三个表：
+
+day_segments - 段落锚点
+speeches - 单人发言（加向量字段 embedding）
+votes - 票型
+阶段 2：RAG 构建
+
+-- 增加向量支持（SQLite 可以用 sqlite-vss 扩展）
+ALTER TABLE speeches ADD COLUMN embedding BLOB;
+
+-- 元数据过滤索引
+CREATE INDEX idx_speech_meta ON speeches(analysis_id, day, speaker_id, intent_tags);
+RAG 查询流程：
+
+用户问："3号第2天为什么投8号？"
+向量化查询 → 找到 3号第2天的发言
+关键：加载局内状态上下文
+第2天票型（谁投谁）
+第1夜死亡信息
+3号之前的发言历史
+8号的角色（如果已知）
+阶段 3：局内状态类型（你的核心想法）
+
+class GameState:
+    """局内状态，随时间更新"""
+    day: int                    # 当前天数
+    phase: str                  # "daytime" | "night" | "sheriff_vote"
+    
+    # 存活状态
+    alive_players: Set[int]
+    dead_players: Dict[int, {"day": int, "method": str}]  # 死亡方式
+    
+    # 身份已知信息
+    confirmed_roles: Dict[int, str]      # 已确认身份
+    claimed_roles: Dict[int, List[str]]  # 声称身份记录
+    
+    # 票型历史
+    vote_history: List[VoteRecord]
+    
+    # 发言立场动态
+    stance_graph: Dict[int, {"attacks": Set[int], "supports": Set[int]}]
+
+def analyze_speech_with_context(speech: Speech, state: GameState) -> Analysis:
+    """结合局内状态分析单条发言"""
+    # 不能只看这条发言说了什么
+    # 要看：之前3号攻击过谁？谁攻击过3号？票型是否一致？
+是否可行？
+完全可行，且狼人杀特别适合这种设计：
+
+时间线清晰：第几天 → 明确的先后顺序
+信息密度高：每条发言、每张票都有意义
+关联性强：A攻击B → B反击 → A改票，形成链条
+现在的缺失
+向量数据库 - 需要存储发言的 embedding 用于语义搜索
+状态机 - 现在没有 GameState 跟踪全局状态
+对话接口 - 现在是三阶段流水线，没有 Q&A 接口
+下一步建议
+先做阶段 1（表结构），因为：
+
+不依赖 AI 窗口
+为 RAG 打基础
+当前代码可以直接用上
+新开窗口后做：
+
+实现 day_segments + speeches + votes 表
+修改 Stage 2 保存逻辑（保存到表而不是 JSON）
+设计 GameState 类
+添加向量嵌入（需要选向量数据库：Chroma/Pinecone/或 SQLite-vss）
+
+方案 A：双写（推荐）
+流程：
+
+
+Stage 2 API 分析 → 返回 JSON (给前端展示)
+                    ↓
+              同时 INSERT 到 speeches 表 (给后续查询)
+好处：
+
+前端仍能实时看到 Stage 2 结果
+数据库有了结构化数据，方便后续 RAG 查询
+不破坏现有流程
+代码改动：
+
+
+# 在 run_stage2_single_day 或主循环中
+for speech in day_result["speeches"]:
+    await db.execute("""
+        INSERT INTO speeches 
+        (analysis_id, day, speaker_id, text_summary, stance_json, ...)
+        VALUES (?, ?, ?, ?, ?, ...)
+    """, (analysis_id, day, speaker_id, ...))
+方案 B：只存表，不返 JSON
+流程：
+
+
+Stage 2 API 分析 → 直接 INSERT 到 speeches 表
+                    ↓
+              前端通过 API 查询表获取数据
+好处：
+
+数据唯一来源（避免 JSON 和表不同步）
+Stage 2 输出体积小
+坏处：
+
+前端要改（从接收 JSON 变成查表）
+实时流式展示需要重新设计
+建议
+用方案 A（双写），因为：
+
+前端展示逻辑不用大改
+渐进式迁移（先有表，再慢慢把查询切到表上）
+Stage 3 可以直接查表，不依赖 Stage 2 的 JSON
+你觉得呢？还是你想在 Stage 2 分析过程中逐条保存到表（分析一条存一条），而不是最后批量存？
+
+用户询问如何设计数据结构来构建RAG（检索增强生成）系统。这是一个关键问题，需要仔细设计。
+
+用户的目标是：
+
+让AI理解玩家发言和投票的深层逻辑
+能评价操作好坏
+能回答"狼人怎么找到神的"这类问题
+为了支持这些能力，RAG需要保存：
+
+时间线信息（什么时候发生了什么）
+因果关系（A导致B相信C是狼）
+多视角（不同玩家看到的信息不同）
+操作评价（好坏的标准）
+让我设计一个适合狼人杀对局分析的RAG数据结构。
+
+这是一个关键问题。让我设计一套适合狼人杀对局分析的 RAG 数据架构。
+
+核心设计原则
+
+1. 时间线是一切的基础（狼人杀是时序游戏）
+2. 因果关系比事实更重要（为什么要这样做）
+3. 多视角是理解的关键（他知道什么，他不知道什么）
+4. 可追溯性（能回答"为什么"）
+推荐的表结构设计
+表1: 时间线事件 (timeline_events)
+
+CREATE TABLE timeline_events (
+    id INTEGER PRIMARY KEY,
+    analysis_id TEXT,
+    day INTEGER,           -- 第几天
+    phase TEXT,            -- 阶段: night/day/sunset/vote
+    event_type TEXT,       -- 类型: speech/vote/death/badge_transfer
+    event_id TEXT,         -- 关联ID (如 speech_id, vote_id)
+    
+    -- 事件内容摘要
+    content TEXT,          -- "8号起跳通灵师，给5号发平民"
+    
+    -- 公开性（谁能看到这个事件）
+    is_public BOOLEAN,     -- 所有人可见？
+    visible_to TEXT,       -- JSON: ["1","2","3"] 或 "all"
+    
+    created_at TEXT
+);
+表2: 玩家发言 (speeches) - 已有表，扩展
+
+-- 在现有表基础上增加RAG字段
+ALTER TABLE speeches ADD COLUMN embedding TEXT;  -- 向量嵌入
+ALTER TABLE speeches ADD COLUMN intent_tags TEXT; -- ["找狼","表水","攻击8号"]
+ALTER TABLE speeches ADD COLUMN impact_score REAL; -- 影响力评分
+ALTER TABLE speeches ADD COLUMN is_key_moment BOOLEAN; -- 是否为转折点
+表3: 推理链 (inference_chains) ⭐ 核心表
+
+CREATE TABLE inference_chains (
+    id INTEGER PRIMARY KEY,
+    analysis_id TEXT,
+    
+    -- 推理者信息
+    observer_id TEXT,      -- 谁在做推理（如"3号玩家"）
+    observer_role TEXT,    -- 他的真实身份（狼人/平民等）
+    observer_perspective TEXT, -- 他当时知道什么（JSON）
+    
+    -- 推理对象
+    target_id TEXT,        -- 推理谁（如"8号玩家"）
+    target_day INTEGER,    -- 第几天的判断
+    
+    -- 推理内容
+    conclusion_type TEXT,  -- "identity" / "intent" / "relationship"
+    conclusion TEXT,       -- "8号是通灵师"
+    confidence REAL,       -- 置信度 0-1
+    reasoning TEXT,        -- 推理过程
+    
+    -- 证据链（关键！）
+    evidence_ids TEXT,     -- JSON: ["speech_12", "vote_8"]
+    evidence_summary TEXT, -- "基于8号的心路历程和票型"
+    
+    -- 正确性验证（用于后续学习）
+    is_correct BOOLEAN,    -- 是否正确
+    truth TEXT,            -- 真实身份/意图
+    error_type TEXT,       -- 错误类型（如"被误导"、"信息不足"）
+    
+    -- 时间戳
+    created_at TEXT
+);
+表4: 知识片段 (knowledge_chunks) ⭐ RAG核心
+
+CREATE TABLE knowledge_chunks (
+    id INTEGER PRIMARY KEY,
+    analysis_id TEXT,
+    
+    -- 片段类型
+    chunk_type TEXT,       -- "strategy" / "mistake" / "insight" / "relationship"
+    
+    -- 内容
+    content TEXT,          -- 自然语言描述
+    embedding TEXT,        -- 向量嵌入（用于语义检索）
+    
+    -- 上下文
+    game_context TEXT,     -- 对局背景（版型、天数）
+    related_players TEXT,  -- JSON: ["3","8"] 涉及的玩家
+    related_events TEXT,   -- JSON: ["speech_15", "vote_day2"]
+    
+    -- 元数据
+    importance_score REAL, -- 重要性
+    is_teaching_material BOOLEAN, -- 是否可作为教学案例
+    
+    created_at TEXT
+);
+表5: 操作策略 (operation_strategies)
+
+CREATE TABLE operation_strategies (
+    id INTEGER PRIMARY KEY,
+    analysis_id TEXT,
+    
+    -- 操作者
+    player_id TEXT,
+    player_role TEXT,      -- 真实身份
+    
+    -- 操作内容
+    operation_type TEXT,   -- "vote" / "speech" / "kill" / "save" / "check"
+    day INTEGER,
+    
+    -- 评价
+    effectiveness_score REAL,  -- 有效性评分
+    skill_level TEXT,      -- "beginner" / "intermediate" / "advanced" / "expert"
+    
+    -- 分析
+    good_points TEXT,      -- 做得好的地方
+    bad_points TEXT,       -- 可以改进的地方
+    alternative_actions TEXT, -- 其他可能的选择
+    
+    -- 教学价值
+    lesson_learned TEXT,   -- 可以学到什么
+    applicable_scenarios TEXT, -- 适用于什么场景
+    
+    created_at TEXT
+);

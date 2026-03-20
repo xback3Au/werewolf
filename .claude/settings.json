@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la uploads/*.txt)",
+      "Bash(sqlite3 backend/analysis.db \"SELECT id, game_name, stage1_result FROM analyses ORDER BY created_at DESC LIMIT 1;\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(sqlite3 backend/analysis.db \"SELECT id, game_name FROM analyses ORDER BY created_at DESC LIMIT 1;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT json_extract\\(stage1_result, ''''$.class_1_structured_facts.night_events_by_day''''\\) FROM analyses WHERE id=''''1773779720004'''';\")",
+      "Read(//tmp/**)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\(f''''Total night events: {len\\(data\\)}''''\\); [print\\(f''''Day {e[day]}: phase={e[phase]}, kill={e.get\\(wolf_kill_target,N/A\\)}''''\\) for e in data]\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT stage1_meta FROM analyses ORDER BY created_at DESC LIMIT 1;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT stage1_meta FROM analyses WHERE stage1_meta IS NOT NULL LIMIT 1;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT id, game_name, created_at FROM analyses ORDER BY created_at DESC LIMIT 5;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT stage1_meta FROM analyses WHERE id=''1773810346714'';\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT json_extract\\(stage1_result, ''$.meta.segments''\\) FROM analyses WHERE id=''1773810346714'';\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT day, segment_type, name FROM day_segments WHERE analysis_id=''1773810346714'' ORDER BY day;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT id, game_name, created_at FROM analyses ORDER BY created_at DESC LIMIT 3;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT day, segment_type, name, for_stage2 FROM day_segments WHERE analysis_id=''1773815010996'' ORDER BY day;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT day, speaker_id, text_summary FROM speeches WHERE analysis_id=''1773815010996'' ORDER BY day, speech_order;\")",
+      "Bash(sqlite3 backend/analysis.db \"SELECT day, name, start_anchor, end_anchor FROM day_segments WHERE analysis_id=''1773815010996'' ORDER BY day;\")",
+      "Bash(python -c \"import re; f=lambda t:re.sub\\(r''[\\\\n\\\\r]+'','' '',t\\); o=''作业平安夜请紧张，\\\\n组织发顺序，\\\\n9号玩家请发言，''; a=''作业平安夜请紧张，组织发顺序，9号玩家请发言''; print\\(''原文:'',repr\\(f\\(o\\)\\)\\); print\\(''锚点:'',repr\\(f\\(a\\)\\)\\); print\\(''匹配:'',f\\(o\\)==f\\(a\\)\\)\")",
+      "Bash(grep -E \"\\\\.env$|\\\\.env\\\\.\")",
+      "Bash(grep -E \"\\(uploads/|outputs/|debug_outputs/|\\\\.log$|node_modules/|\\\\.pyc$|__pycache__|\\\\.db$|\\\\.env\\)\")",
+      "Bash(grep -E \"\\(uploads/|outputs/|\\\\.pyc$|__pycache__|\\\\.db$\\)\")"
+    ],
+    "additionalDirectories": [
+      "D:\\A文件\\研二\\AI学习\\一些项目（简历生成）\\werewolf\\uploads"
+    ]
+  }
+}

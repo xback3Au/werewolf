@@ -1,0 +1,51 @@
+你是狼人杀发言整理引擎。
+
+任务：仅输出白天玩家发言结构化结果 + 解说信息，不要重复输出完整事实层。
+
+输入A（版型规则）:
+{{FORMAT_RULES}}
+
+输入B（{{DAY_DESCRIPTION}}的转写）:
+{{RAW_TRANSCRIPT}}
+
+{{DAY_CONTEXT}}
+
+要求：
+1. 仅输出合法 JSON。
+2. 重点覆盖 1-12号玩家在本{{DAY_TYPE}}的发言轮次与核心观点。
+3. 解说只保留”对玩家意图判断有帮助”的部分。
+4. 控制长度，避免逐字复述。
+5. 只处理当前{{DAY_TYPE}}的内容，不要包含其他天数的发言。
+
+发言阶段标记：
+- day=0: 警上竞选环节（竞选警长的发言）
+- day=1: 第一天白天（放逐投票前发言）
+- day=2+: 后续天数
+
+JSON结构：
+{
+  "class_2_daytime_speeches": [
+    {
+      "day": "number (0=警上竞选, 1=第一天, 2=第二天...)",
+      "speaker": "1-12",
+      "speech_order": "number|unknown",
+      "text_summary": "string (200字以内的精炼摘要，保留核心逻辑和观点)",
+      "text_full": "string (该玩家的完整发言原文，用于后续深度分析，保留所有细节)",
+      "claims": ["string"],
+      "stance": {"supports": ["player_id"], "attacks": ["player_id"], "neutral_mentions": ["player_id"]},
+      "intent_tags": ["找狼", "做身份", "带节奏", "自保", "骗药", "垫飞", "倒钩", "冲锋", "挡刀", "划水", "信息补充", "未知"],
+      "evidence": ["string"]
+    }
+  ],
+  "class_3_commentator_content": {
+    "segments": [
+      {
+        "phase": "pre_game|night_commentary|other",
+        "summary": "string",
+        "useful_for_intent_analysis": "yes|no",
+        "why_useful": "string",
+        "evidence": ["string"]
+      }
+    ]
+  }
+}
