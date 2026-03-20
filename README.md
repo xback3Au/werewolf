@@ -413,13 +413,42 @@ werewolf/
 
 ## 开发计划
 
-- [x] 基础三阶段分析
-- [x] 实时 WebSocket 通信
-- [x] 动态身份推断
+### 已完成
+- [x] 基础三阶段分析（事实提取 / 发言整理 / 意图推断）
+- [x] 实时 WebSocket 通信 + 流式推理展示
+- [x] 动态身份推断（好人/狼人概率）
 - [x] 历史记录管理
+
+### 下一阶段：自主学习 Agent
+
+本项目下一步将从"被动分析工具"进化为**会主动学习的狼人杀 AI 教练**。
+
+**Phase 1 — 数据结构化（RAG 底座）**
+- [ ] 建立关系型表：speeches / votes / timeline_events / inference_chains / knowledge_chunks
+- [ ] Stage2/3 双写（JSON 给前端 + 结构化数据入库）
+- [ ] 实现 GameState 类（追踪局内状态：存活、身份、票型、立场）
+
+**Phase 2 — 工具层（Tool Calling）**
+- [ ] game_parser_tool：对局文本 → 结构化 JSON
+- [ ] logic_checker_tool：检测玩家发言前后矛盾
+- [ ] identity_inference_tool：推断身份概率（核心）
+- [ ] tactic_summarizer_tool：归纳本局战术要点
+- [ ] feedback_parser_tool：解析用户的自然语言纠正
+- [ ] memory_update_tool：将纠正转化为经验存入知识库
+
+**Phase 3 — Agent 主体（ReAct 规划）**
+- [ ] Agent 自主规划循环：接收对局 → 调工具 → 推理 → 输出报告
+- [ ] 用户纠正分支：告知 Agent 判断错误 → Agent 修正认知 → 生成经验
+- [ ] 短期记忆（单局上下文）+ 长期记忆（跨局经验库）
+
+**Phase 4 — 越学越强**
+- [ ] 向量语义检索（RAG），新局自动调用历史经验
+- [ ] 跨局统计分析（打法胜率、高频模式）
+- [ ] 前端对话复盘界面
+
+### 其他可视化功能
 - [ ] 投票热力图
 - [ ] 玩家关系图
-- [ ] 多对局对比分析
 
 ---
 
